@@ -19,12 +19,6 @@ function search() {
 
     const currentTable = algo === 'dfs' ? tablesToVisit.pop() : tablesToVisit.shift();
 
-    if (interactive) {
-      delay(0.3);
-      console.clear();
-      printWeeks(currentTable, numOfGolfers, groupSize);
-    }
-
     if (isSolution(currentTable)) {
       console.clear();
       printWeeks(currentTable, numOfGolfers, groupSize);

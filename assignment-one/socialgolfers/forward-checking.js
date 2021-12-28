@@ -1,6 +1,6 @@
 const { parseArguments, printWeeks, getOtherGolfersInGroup, delay } = require('./utils');
 
-const [weeks, interactive] = parseArguments();
+const [weeks] = parseArguments();
 const numOfGolfers = 32;
 const groupSize = 4;
 const weekMatrix = new Array(weeks).fill().map((x) => new Array(numOfGolfers).fill(0));
@@ -21,12 +21,6 @@ function placeGolfer(index = 0) {
 
     weekMatrix[row][column] = i;
     updateDomain(0, i, row, column);
-
-    if (interactive) {
-      delay(0.3);
-      console.clear();
-      printWeeks(weekMatrix, numOfGolfers, groupSize);
-    }
 
     if (placeGolfer(index + 1)) return true;
 
