@@ -1,67 +1,68 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿using Google.OrTools.Sat;
 
-using Google.OrTools.Sat;
+var numberOfGroups = int.Parse(args[0]);
+var golfersPerGroup = int.Parse(args[1]);
+var numberOfWeeks = int.Parse(args[2]);
 
-var numberOfPlayers = 32;
-var numberOfDays = 9;
-var playersPerGroup = 4;
-var numberOfGroups = numberOfPlayers / playersPerGroup;
-    
+var numberOfGolfers = numberOfGroups * golfersPerGroup;
+var maximumNumberOfWeeks = (numberOfGolfers - 1 )/ (golfersPerGroup - 1);
+
+Console.WriteLine($"Got SGP instance {numberOfGroups}-{golfersPerGroup}-{numberOfWeeks}");
+Console.WriteLine($"Maximum number of weeks for the given instance is {maximumNumberOfWeeks}");
+
 var model = new CpModel();
 
-var schedule = new Dictionary<string, IntVar>();
-var playerAssignments = new List<PlayerAssignment>();
+var decisionVariablesList = new List<PlayerAssignment>();
+var decisionVariablesLookup = new Dictionary<string, IntVar>();
 
-for (var p = 0; p < numberOfPlayers; p++)
+for (var golfer = 0; golfer < numberOfGolfers; golfer++)
 {
-    for (var d = 0; d < numberOfDays; d++)
-    {
-        for (var g = 0; g < numberOfGroups; g++)
+    for (var week = 0; week < numberOfWeeks; week++)
+    {   
+        for (var group = 0; group < numberOfGroups; group++)
         {
-            var key = $"{p}_{d}_{g}";
+            var key = $"{golfer}_{week}_{group}";
             var plays = model.NewBoolVar(key);
-            schedule[key] = plays;
-            playerAssignments.Add(new PlayerAssignment
+            decisionVariablesLookup[key] = plays;
+            decisionVariablesList.Add(new PlayerAssignment
             {
                 Key = key,
-                Day = d,
-                Group = g,
-                Player = p,
+                Week = week,
+                Group = group,
+                Golfer = golfer,
                 CspVariable = plays
             });
         }
     }
 }
 
-foreach (var grouped in playerAssignments.GroupBy(x => new { x.Player, x.Day}))
+foreach (var grouped in decisionVariablesList.GroupBy(x => new {Player = x.Golfer, Day = x.Week}))
 {
     model.Add(LinearExpr.Sum(grouped.ToList().Select(x => x.CspVariable)) == 1);
 }
 
-foreach (var grouped in playerAssignments.GroupBy(x => new { x.Day, x.Group}))
+foreach (var grouped in decisionVariablesList.GroupBy(x => new {Day = x.Week, x.Group}))
 {
-    model.Add(LinearExpr.Sum(grouped.ToList().Select(x => x.CspVariable)) == playersPerGroup);   
+    model.Add(LinearExpr.Sum(grouped.ToList().Select(x => x.CspVariable)) == golfersPerGroup);   
 }
 
-for (var p1 = 0; p1 < numberOfPlayers; p1++)
+for (var firstGolfer = 0; firstGolfer < numberOfGolfers; firstGolfer++)
 {
-    for (var p2 = p1 + 1; p2 < numberOfPlayers; p2++)
+    for (var secondGolfer = firstGolfer + 1; secondGolfer < numberOfGolfers; secondGolfer++)
     {
         var playersTogether = new List<IntVar>();
-        for (var d = 0; d < numberOfDays; d++)
+        for (var week = 0; week < numberOfWeeks; week++)
         {
-            for (var g = 0; g < numberOfGroups; g++)
+            for (var group = 0; group < numberOfGroups; group++)
             {
-                var together = model.NewBoolVar($"{p1}_{p2}_{d}_{g}");
+                var together = model.NewBoolVar($"{firstGolfer}_{secondGolfer}_{week}_{group}");
                 playersTogether.Add(together);
-                var player1 = schedule[$"{p1}_{d}_{g}"];
-                var player2 = schedule[$"{p2}_{d}_{g}"];
-                model.Add(together == 1).OnlyEnforceIf(new ILiteral[] {player1, player2});
-                model.Add(together == 0).OnlyEnforceIf(new ILiteral[] {player1.Not(), player2.Not()});
-                // model.Add(player1 + player2 - together <= 1);
+                var golfer1 = decisionVariablesLookup[$"{firstGolfer}_{week}_{group}"];
+                var golfer2 = decisionVariablesLookup[$"{secondGolfer}_{week}_{group}"];
+                model.Add(together == 1).OnlyEnforceIf(new ILiteral[] {golfer1, golfer2});
+                model.Add(together == 0).OnlyEnforceIf(new ILiteral[] {golfer1.Not(), golfer2.Not()});
             }
         }
-
         model.Add(LinearExpr.Sum(playersTogether) == 1);
     }   
 }
@@ -70,33 +71,32 @@ for (var p1 = 0; p1 < numberOfPlayers; p1++)
 var solver = new CpSolver();
 solver.Solve(model);
 
-Console.WriteLine("Statistics");
+var solution =
+    decisionVariablesList.ToDictionary(variable => variable.Key, variable => solver.Value(variable.CspVariable));
+
+PrintSolution();  
+
+Console.WriteLine("\nStatistics");
 Console.WriteLine($"  conflicts : {solver.NumConflicts()}");
 Console.WriteLine($"  branches  : {solver.NumBranches()}");
 Console.WriteLine($"  wall time : {solver.WallTime()} s");
 
-var solution = new Dictionary<string, long>();
-foreach (var assignment in playerAssignments)
+void PrintSolution()
 {
-    solution[$"{assignment.Player}_{assignment.Day}_{assignment.Group}"] = solver.Value(assignment.CspVariable);
+    for (var week = 0; week < numberOfWeeks; week++)
+    {
+        Console.WriteLine($"\nWeek: {week + 1}\n");
+        for (var group = 0; @group < numberOfGroups; @group++)
+        {
+            for (var golfer = 0; golfer < numberOfGolfers; golfer++)
+            {
+                if (solution[$"{golfer}_{week}_{@group}"] == 1)
+                    Console.Write($" {golfer}, ");
+            }
+
+            Console.WriteLine();
+        }
+    }
 }
 
-for (var day = 0; day < numberOfDays; day++)
-{
-    Console.WriteLine($"Day: {day}");
-    for (var group = 0; group < numberOfGroups; group++)
-    {
-        for (var player = 0; player < numberOfPlayers; player++)
-        {
-            if (solution[$"{player}_{day}_{group}"] == 1)
-            {
-                Console.Write($"{player}, ");
-            }
-        }
-
-        Console.WriteLine();
-    }
-}  
-
-
-public readonly record struct PlayerAssignment(string Key, int Player, int Day, int Group, IntVar? CspVariable);
+public readonly record struct PlayerAssignment(string Key, int Golfer, int Week, int Group, IntVar? CspVariable);
