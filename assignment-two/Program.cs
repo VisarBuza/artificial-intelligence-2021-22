@@ -8,11 +8,11 @@ var numberOfGolfers = numberOfGroups * golfersPerGroup;
 var maximumNumberOfWeeks = (numberOfGolfers - 1 )/ (golfersPerGroup - 1);
 
 Console.WriteLine($"Got SGP instance {numberOfGroups}-{golfersPerGroup}-{numberOfWeeks}");
-Console.WriteLine($"Maximum number of weeks for the given instance is {maximumNumberOfWeeks}");
+Console.WriteLine($"Maximum number of weeks for the given instance is {maximumNumberOfWeeks}\n");
 
 var model = new CpModel();
 
-var decisionVariablesList = new List<PlayerAssignment>();
+var decisionVariablesList = new List<DecisionVariable>();
 var decisionVariablesLookup = new Dictionary<string, IntVar>();
 
 for (var golfer = 0; golfer < numberOfGolfers; golfer++)
@@ -24,7 +24,7 @@ for (var golfer = 0; golfer < numberOfGolfers; golfer++)
             var key = $"{golfer}_{week}_{group}";
             var plays = model.NewBoolVar(key);
             decisionVariablesLookup[key] = plays;
-            decisionVariablesList.Add(new PlayerAssignment
+            decisionVariablesList.Add(new DecisionVariable
             {
                 Key = key,
                 Week = week,
@@ -67,36 +67,35 @@ for (var firstGolfer = 0; firstGolfer < numberOfGolfers; firstGolfer++)
     }   
 }
 
-
 var solver = new CpSolver();
-solver.Solve(model);
+var status = solver.Solve(model);
 
-var solution =
+var solution =  
     decisionVariablesList.ToDictionary(variable => variable.Key, variable => solver.Value(variable.CspVariable));
 
-PrintSolution();  
+PrintSolution();
 
 Console.WriteLine("\nStatistics");
-Console.WriteLine($"  conflicts : {solver.NumConflicts()}");
-Console.WriteLine($"  branches  : {solver.NumBranches()}");
-Console.WriteLine($"  wall time : {solver.WallTime()} s");
+Console.WriteLine($"CspSolverStatus : {status.ToString()}");
+Console.WriteLine($"Conflicts : {solver.NumConflicts()}");
+Console.WriteLine($"Branches  : {solver.NumBranches()}");
+Console.WriteLine($"Wall time : {solver.WallTime()} s");
 
 void PrintSolution()
 {
     for (var week = 0; week < numberOfWeeks; week++)
     {
-        Console.WriteLine($"\nWeek: {week + 1}\n");
         for (var group = 0; @group < numberOfGroups; @group++)
         {
             for (var golfer = 0; golfer < numberOfGolfers; golfer++)
             {
-                if (solution[$"{golfer}_{week}_{@group}"] == 1)
-                    Console.Write($" {golfer}, ");
+                if (solution[$"{golfer}_{week}_{group}"] == 1)
+                    Console.Write($" {(golfer < 10 ? " " + golfer  : golfer)} ");
             }
-
-            Console.WriteLine();
+            Console.Write(" | ");
         }
+        Console.WriteLine("");
     }
 }
 
-public readonly record struct PlayerAssignment(string Key, int Golfer, int Week, int Group, IntVar? CspVariable);
+public readonly record struct  DecisionVariable(string Key, int Golfer, int Week, int Group, IntVar? CspVariable);
